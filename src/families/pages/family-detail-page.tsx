@@ -31,6 +31,7 @@ import { useDeleteGuardian } from '../hooks/use-delete-guardian'
 import { useFamily } from '../hooks/use-family'
 import { useReactivateFamily } from '../hooks/use-reactivate-family'
 import type { Guardian, Relationship } from '../families.types'
+import { notifyError } from '../../lib/notifications'
 
 const RELATIONSHIP_LABELS: Record<Relationship, string> = {
   padre: 'Padre',
@@ -109,7 +110,7 @@ export default function FamilyDetailPage() {
             color="red"
             leftSection={<IconBan size={16} />}
             loading={deactivateMutation.isPending}
-            onClick={() => deactivateMutation.mutate(family.id)}
+            onClick={() => deactivateMutation.mutate(family.id, { onError: notifyError })}
           >
             Desactivar
           </Button>
@@ -119,7 +120,7 @@ export default function FamilyDetailPage() {
             color="green"
             leftSection={<IconCircleCheck size={16} />}
             loading={reactivateMutation.isPending}
-            onClick={() => reactivateMutation.mutate(family.id)}
+            onClick={() => reactivateMutation.mutate(family.id, { onError: notifyError })}
           >
             Activar
           </Button>
@@ -219,10 +220,10 @@ export default function FamilyDetailPage() {
                           aria-label="Eliminar responsable"
                           loading={deleteGuardianMutation.isPending}
                           onClick={() =>
-                            deleteGuardianMutation.mutate({
-                              familyId: family.id,
-                              guardianId: guardian.id,
-                            })
+                            deleteGuardianMutation.mutate(
+                              { familyId: family.id, guardianId: guardian.id },
+                              { onError: notifyError },
+                            )
                           }
                         >
                           <IconTrash size={16} />

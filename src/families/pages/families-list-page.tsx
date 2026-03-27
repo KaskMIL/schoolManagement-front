@@ -21,6 +21,7 @@ import { useDeactivateFamily } from '../hooks/use-deactivate-family'
 import { useFamilies } from '../hooks/use-families'
 import { useReactivateFamily } from '../hooks/use-reactivate-family'
 import type { FamilyStatus, FamilySummary } from '../families.types'
+import { notifyError } from '../../lib/notifications'
 
 const STATUS_LABELS: Record<FamilyStatus, string> = {
   activa: 'Activa',
@@ -98,7 +99,9 @@ export default function FamiliesListPage() {
                   color="red"
                   aria-label="Desactivar"
                   loading={deactivateMutation.isPending}
-                  onClick={() => deactivateMutation.mutate(family.id)}
+                  onClick={() =>
+                    deactivateMutation.mutate(family.id, { onError: notifyError })
+                  }
                 >
                   <IconBan size={16} />
                 </ActionIcon>
@@ -108,7 +111,9 @@ export default function FamiliesListPage() {
                   color="green"
                   aria-label="Activar"
                   loading={reactivateMutation.isPending}
-                  onClick={() => reactivateMutation.mutate(family.id)}
+                  onClick={() =>
+                    reactivateMutation.mutate(family.id, { onError: notifyError })
+                  }
                 >
                   <IconCircleCheck size={16} />
                 </ActionIcon>

@@ -1,3 +1,5 @@
+import { ApiError } from './api-error'
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...options,
@@ -10,7 +12,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { message?: string }
-    throw new Error(body.message ?? `Error ${res.status}`)
+    throw new ApiError(res.status, body.message ?? `Error ${res.status}`)
   }
 
   if (res.status === 204) return undefined as T

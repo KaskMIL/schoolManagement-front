@@ -1,8 +1,10 @@
 import { useForm } from '@mantine/form'
-import { Button, Group, Modal, Stack, Textarea, TextInput } from '@mantine/core'
+import { Alert, Button, Group, Modal, Stack, Textarea, TextInput } from '@mantine/core'
+import { IconAlertCircle } from '@tabler/icons-react'
 import { useCreateFamily } from '../hooks/use-create-family'
 import { useUpdateFamily } from '../hooks/use-update-family'
 import type { FamilySummary } from '../families.types'
+import { getErrorMessage } from '../../lib/api-error'
 
 interface FamilyFormProps {
   opened: boolean
@@ -38,6 +40,14 @@ export function FamilyForm({ opened, onClose, family }: FamilyFormProps) {
   })
 
   const isPending = isEdit ? updateMutation.isPending : createMutation.isPending
+  const error = isEdit ? updateMutation.error : createMutation.error
+
+  const handleClose = () => {
+    createMutation.reset()
+    updateMutation.reset()
+    form.reset()
+    onClose()
+  }
 
   const handleSubmit = form.onSubmit((values) => {
     const data = {
@@ -64,12 +74,17 @@ export function FamilyForm({ opened, onClose, family }: FamilyFormProps) {
   return (
     <Modal
       opened={opened}
-      onClose={onClose}
+      onClose={handleClose}
       title={isEdit ? 'Editar familia' : 'Nueva familia'}
       size="md"
     >
       <form onSubmit={handleSubmit}>
         <Stack gap="sm">
+          {error && (
+            <Alert color="red" icon={<IconAlertCircle size={16} />} title="Error">
+              {getErrorMessage(error)}
+            </Alert>
+          )}
           <TextInput
             label="Nombre de la familia"
             placeholder="Ej: García"
@@ -103,7 +118,7 @@ export function FamilyForm({ opened, onClose, family }: FamilyFormProps) {
             {...form.getInputProps('notes')}
           />
           <Group justify="flex-end" mt="sm">
-            <Button variant="default" onClick={onClose} disabled={isPending}>
+            <Button variant="default" onClick={handleClose} disabled={isPending}>
               Cancelar
             </Button>
             <Button type="submit" loading={isPending}>

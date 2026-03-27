@@ -1,8 +1,10 @@
 import { useForm } from '@mantine/form'
-import { Button, Checkbox, Group, Modal, Select, Stack, Textarea, TextInput } from '@mantine/core'
+import { Alert, Button, Checkbox, Group, Modal, Select, Stack, Textarea, TextInput } from '@mantine/core'
+import { IconAlertCircle } from '@tabler/icons-react'
 import { useCreateGuardian } from '../hooks/use-create-guardian'
 import { useUpdateGuardian } from '../hooks/use-update-guardian'
 import type { Guardian, Relationship } from '../families.types'
+import { getErrorMessage } from '../../lib/api-error'
 
 interface GuardianFormProps {
   opened: boolean
@@ -52,6 +54,14 @@ export function GuardianForm({ opened, onClose, familyId, guardian }: GuardianFo
   })
 
   const isPending = isEdit ? updateMutation.isPending : createMutation.isPending
+  const error = isEdit ? updateMutation.error : createMutation.error
+
+  const handleClose = () => {
+    createMutation.reset()
+    updateMutation.reset()
+    form.reset()
+    onClose()
+  }
 
   const handleSubmit = form.onSubmit((values) => {
     const data = {
@@ -83,12 +93,17 @@ export function GuardianForm({ opened, onClose, familyId, guardian }: GuardianFo
   return (
     <Modal
       opened={opened}
-      onClose={onClose}
+      onClose={handleClose}
       title={isEdit ? 'Editar responsable' : 'Agregar responsable'}
       size="lg"
     >
       <form onSubmit={handleSubmit}>
         <Stack gap="sm">
+          {error && (
+            <Alert color="red" icon={<IconAlertCircle size={16} />} title="Error">
+              {getErrorMessage(error)}
+            </Alert>
+          )}
           <Group grow>
             <TextInput
               label="Nombre"
@@ -152,7 +167,7 @@ export function GuardianForm({ opened, onClose, familyId, guardian }: GuardianFo
             {...form.getInputProps('notes')}
           />
           <Group justify="flex-end" mt="sm">
-            <Button variant="default" onClick={onClose} disabled={isPending}>
+            <Button variant="default" onClick={handleClose} disabled={isPending}>
               Cancelar
             </Button>
             <Button type="submit" loading={isPending}>
