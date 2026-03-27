@@ -1,0 +1,13 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { familiesApi } from '../families.api'
+
+export function useReactivateFamily() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (familyId: string) => familiesApi.reactivate(familyId),
+    onSuccess: (_, familyId) => {
+      void queryClient.invalidateQueries({ queryKey: ['families', 'list'] })
+      void queryClient.invalidateQueries({ queryKey: ['families', familyId] })
+    },
+  })
+}
