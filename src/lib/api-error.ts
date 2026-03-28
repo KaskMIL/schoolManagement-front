@@ -17,6 +17,8 @@ export function getErrorMessage(error: unknown): string {
     switch (error.status) {
       case 400:
         return 'Los datos ingresados no son válidos.'
+      case 401:
+        return 'Usuario o contraseña incorrectos.'
       case 403:
         return 'No tenés permiso para realizar esta acción.'
       case 404:
