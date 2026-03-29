@@ -45,6 +45,10 @@ export const router = createBrowserRouter([
                 path: 'precios',
                 lazy: lazyComponent(import('./configuracion/pages/precios-config-page')),
               },
+              {
+                path: 'general',
+                lazy: lazyComponent(import('./configuracion/pages/general-config-page')),
+              },
             ],
           },
         ],

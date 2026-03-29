@@ -9,7 +9,9 @@ export default function ConfiguracionLayout() {
     ? 'instituciones'
     : location.pathname.startsWith('/configuracion/precios')
       ? 'precios'
-      : 'usuarios'
+      : location.pathname.startsWith('/configuracion/general')
+        ? 'general'
+        : 'usuarios'
 
   return (
     <Stack gap="md">
@@ -18,6 +20,7 @@ export default function ConfiguracionLayout() {
           <Tabs.Tab value="usuarios">Usuarios</Tabs.Tab>
           <Tabs.Tab value="instituciones">Instituciones</Tabs.Tab>
           <Tabs.Tab value="precios">Precios</Tabs.Tab>
+          <Tabs.Tab value="general">General</Tabs.Tab>
         </Tabs.List>
       </Tabs>
       <Outlet />
