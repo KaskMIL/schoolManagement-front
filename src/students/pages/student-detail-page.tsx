@@ -17,9 +17,13 @@ import { useDisclosure } from '@mantine/hooks'
 import { IconArrowLeft, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react'
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
+import { useFeeConcepts } from '../../fee-concepts/hooks/use-fee-concepts'
 import { useFamilies } from '../../families/hooks/use-families'
 import { useInstitutions } from '../../institutions/hooks/use-institutions'
 import { notifyError } from '../../lib/notifications'
+import { StudentServiceForm } from '../../student-services/components/student-service-form'
+import { useDeleteStudentService } from '../../student-services/hooks/use-student-services'
+import { useStudentServices } from '../../student-services/hooks/use-student-services'
 import { EmergencyContactForm } from '../components/emergency-contact-form'
 import { EnrollmentForm } from '../components/enrollment-form'
 import { StudentForm } from '../components/student-form'
@@ -34,6 +38,7 @@ import type {
   Shift,
   StudentStatus,
 } from '../students.types'
+import type { StudentService } from '../../student-services/student-services.types'
 
 const STATUS_LABELS: Record<StudentStatus, string> = {
   activo: 'Activo',
@@ -101,6 +106,12 @@ function formatDate(dateStr: string | null | undefined): string | null {
   return d.toLocaleDateString('es-AR')
 }
 
+function gradeLabel(level: Level, grade: number): string {
+  if (level === 'jardin') return `Sala de ${grade}`
+  if (level === 'primaria') return `${grade}° grado`
+  return `${grade}° año`
+}
+
 export default function StudentDetailPage() {
   const { studentId } = useParams<{ studentId: string }>()
   const navigate = useNavigate()
@@ -110,11 +121,16 @@ export default function StudentDetailPage() {
   const [editEnrollment, setEditEnrollment] = useState<Enrollment | null>(null)
   const [addContactOpened, { open: openAddContact, close: closeAddContact }] = useDisclosure(false)
   const [editContact, setEditContact] = useState<EmergencyContact | null>(null)
+  const [addServiceOpened, { open: openAddService, close: closeAddService }] = useDisclosure(false)
+  const [editService, setEditService] = useState<StudentService | null>(null)
 
   const { data: student, isLoading } = useStudent(studentId!)
   const deleteContactMutation = useDeleteEmergencyContact()
+  const deleteServiceMutation = useDeleteStudentService(studentId!)
   const { data: families } = useFamilies({ limit: 500, status: 'activa' })
   const { data: institutions } = useInstitutions()
+  const { data: studentServices } = useStudentServices(studentId!)
+  const { data: feeConcepts } = useFeeConcepts(student?.institution.id ?? null)
 
   if (isLoading) {
     return (
@@ -128,7 +144,6 @@ export default function StudentDetailPage() {
 
   return (
     <Stack gap="lg">
-      {/* Encabezado */}
       <Group>
         <ActionIcon
           variant="subtle"
@@ -146,14 +161,12 @@ export default function StudentDetailPage() {
         </Badge>
       </Group>
 
-      {/* Acciones */}
       <Group>
         <Button variant="default" leftSection={<IconPencil size={16} />} onClick={openEdit}>
           Editar
         </Button>
       </Group>
 
-      {/* Datos del alumno */}
       <Paper withBorder p="md" radius="md">
         <Title order={4} mb="md">
           Información del alumno
@@ -199,7 +212,6 @@ export default function StudentDetailPage() {
 
       <Divider />
 
-      {/* Inscripciones */}
       <Stack gap="sm">
         <Group justify="space-between">
           <Title order={3}>Inscripciones</Title>
@@ -239,7 +251,7 @@ export default function StudentDetailPage() {
                     <Table.Tr key={enrollment.id}>
                       <Table.Td fw={500}>{enrollment.academicYear}</Table.Td>
                       <Table.Td>{LEVEL_LABELS[enrollment.level]}</Table.Td>
-                      <Table.Td>{enrollment.gradeOrRoom}</Table.Td>
+                      <Table.Td>{gradeLabel(enrollment.level, enrollment.grade)}</Table.Td>
                       <Table.Td>{SECTION_LABELS[enrollment.section]}</Table.Td>
                       <Table.Td>{SHIFT_LABELS[enrollment.shift]}</Table.Td>
                       <Table.Td>
@@ -270,7 +282,79 @@ export default function StudentDetailPage() {
 
       <Divider />
 
-      {/* Contactos de emergencia */}
+      <Stack gap="sm">
+        <Group justify="space-between">
+          <Title order={3}>Servicios adicionales</Title>
+          <Button
+            size="sm"
+            variant="default"
+            leftSection={<IconPlus size={14} />}
+            onClick={openAddService}
+          >
+            Agregar servicio
+          </Button>
+        </Group>
+        <Table.ScrollContainer minWidth={600}>
+          <Table withTableBorder withColumnBorders={false}>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Servicio</Table.Th>
+                <Table.Th>Año</Table.Th>
+                <Table.Th>Vigente desde</Table.Th>
+                <Table.Th>Vigente hasta</Table.Th>
+                <Table.Th>Notas</Table.Th>
+                <Table.Th>Acciones</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {!studentServices || studentServices.length === 0 ? (
+                <Table.Tr>
+                  <Table.Td colSpan={6} ta="center" py="xl">
+                    <Text c="dimmed">Sin servicios contratados</Text>
+                  </Table.Td>
+                </Table.Tr>
+              ) : (
+                [...studentServices]
+                  .sort((a, b) => b.academicYear - a.academicYear)
+                  .map((svc) => (
+                    <Table.Tr key={svc.id}>
+                      <Table.Td fw={500}>{svc.feeConcept.name}</Table.Td>
+                      <Table.Td>{svc.academicYear}</Table.Td>
+                      <Table.Td>{formatDate(svc.activeFrom)}</Table.Td>
+                      <Table.Td>{formatDate(svc.activeTo)}</Table.Td>
+                      <Table.Td>{svc.notes ?? '—'}</Table.Td>
+                      <Table.Td>
+                        <Group gap={4}>
+                          <ActionIcon
+                            variant="subtle"
+                            aria-label="Editar servicio"
+                            onClick={() => setEditService(svc)}
+                          >
+                            <IconPencil size={16} />
+                          </ActionIcon>
+                          <ActionIcon
+                            variant="subtle"
+                            color="red"
+                            aria-label="Eliminar servicio"
+                            loading={deleteServiceMutation.isPending}
+                            onClick={() =>
+                              deleteServiceMutation.mutate(svc.id, { onError: notifyError })
+                            }
+                          >
+                            <IconTrash size={16} />
+                          </ActionIcon>
+                        </Group>
+                      </Table.Td>
+                    </Table.Tr>
+                  ))
+              )}
+            </Table.Tbody>
+          </Table>
+        </Table.ScrollContainer>
+      </Stack>
+
+      <Divider />
+
       <Stack gap="sm">
         <Group justify="space-between">
           <Title order={3}>Contactos de emergencia</Title>
@@ -343,6 +427,21 @@ export default function StudentDetailPage() {
         </Table.ScrollContainer>
       </Stack>
 
+      <StudentServiceForm
+        key="add-service"
+        opened={addServiceOpened}
+        onClose={closeAddService}
+        studentId={student.id}
+        services={feeConcepts ?? []}
+      />
+      <StudentServiceForm
+        key={editService?.id ?? 'edit-service'}
+        opened={!!editService}
+        onClose={() => setEditService(null)}
+        studentId={student.id}
+        services={feeConcepts ?? []}
+        service={editService ?? undefined}
+      />
       <StudentForm
         key={student.id}
         opened={editOpened}

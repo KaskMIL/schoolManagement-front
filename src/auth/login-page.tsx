@@ -1,13 +1,15 @@
 import { Alert, Box, Button, Center, Paper, PasswordInput, Stack, TextInput, Title } from '@mantine/core'
 import { useForm } from '@mantine/form'
-import { Navigate } from 'react-router'
+// import { Navigate } from 'react-router'
 import { getErrorMessage } from '../lib/api-error'
-import { useCurrentUser } from './hooks/use-current-user'
+// import { useCurrentUser } from './hooks/use-current-user'
 import { useLogin } from './hooks/use-login'
+import { useNavigate } from 'react-router'
 
 export default function LoginPage() {
-  const { isSuccess } = useCurrentUser()
+  // const { isSuccess } = useCurrentUser()
   const login = useLogin()
+  const navigate = useNavigate();
 
   const form = useForm({
     initialValues: { username: '', password: '' },
@@ -17,9 +19,9 @@ export default function LoginPage() {
     },
   })
 
-  if (isSuccess) {
-    return <Navigate to="/familias" replace />
-  }
+  // if (isSuccess) {
+  //   return <Navigate to="/familias" replace />
+  // }
 
   return (
     <Center h="100vh" bg="gray.0">
@@ -30,7 +32,9 @@ export default function LoginPage() {
         <Paper withBorder shadow="sm" p="xl" radius="md">
           <form
             onSubmit={form.onSubmit((values) => {
-              login.mutate(values)
+              login.mutate(values, {
+                onSuccess: () => navigate('/familias')
+              })
             })}
           >
             <Stack gap="md">

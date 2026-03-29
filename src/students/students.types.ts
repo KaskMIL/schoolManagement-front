@@ -14,7 +14,7 @@ export interface Enrollment {
   updatedAt: string
   academicYear: number
   level: Level
-  gradeOrRoom: string
+  grade: number
   section: Section
   shift: Shift
   status: EnrollmentStatus
@@ -84,7 +84,7 @@ export type UpdateStudentData = Omit<CreateStudentData, 'familyId' | 'institutio
 export interface CreateEnrollmentData {
   academicYear: number
   level: Level
-  gradeOrRoom: string
+  grade: number
   section: Section
   shift: Shift
   status?: EnrollmentStatus

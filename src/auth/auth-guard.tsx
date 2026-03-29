@@ -3,9 +3,9 @@ import { Navigate, Outlet } from 'react-router'
 import { useCurrentUser } from './hooks/use-current-user'
 
 export default function AuthGuard() {
-  const { isLoading, isError } = useCurrentUser()
+  const { isLoading, isError, isFetching } = useCurrentUser()
 
-  if (isLoading) {
+  if (isLoading || (isError && isFetching)) {
     return (
       <Center h="100vh">
         <Loader />

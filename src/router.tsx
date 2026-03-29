@@ -1,6 +1,6 @@
 import AuthGuard from './auth/auth-guard'
 import AppShellLayout from './layout/app-shell'
-import { createBrowserRouter } from 'react-router'
+import { createBrowserRouter, Navigate } from 'react-router'
 
 export const router = createBrowserRouter([
   {
@@ -24,6 +24,28 @@ export const router = createBrowserRouter([
           {
             path: '/alumnos/:studentId',
             lazy: lazyComponent(import('./students/pages/student-detail-page')),
+          },
+          {
+            path: '/configuracion',
+            lazy: lazyComponent(import('./configuracion/configuracion-layout')),
+            children: [
+              {
+                index: true,
+                element: <Navigate to="/configuracion/usuarios" replace />,
+              },
+              {
+                path: 'usuarios',
+                lazy: lazyComponent(import('./users/pages/users-config-page')),
+              },
+              {
+                path: 'instituciones',
+                lazy: lazyComponent(import('./institutions/pages/institutions-config-page')),
+              },
+              {
+                path: 'precios',
+                lazy: lazyComponent(import('./configuracion/pages/precios-config-page')),
+              },
+            ],
           },
         ],
       },

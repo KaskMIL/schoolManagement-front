@@ -14,7 +14,7 @@ import { IconAlertCircle } from '@tabler/icons-react'
 import { getErrorMessage } from '../../lib/api-error'
 import { useCreateEnrollment } from '../hooks/use-create-enrollment'
 import { useUpdateEnrollment } from '../hooks/use-update-enrollment'
-import type { Enrollment } from '../students.types'
+import type { Enrollment, Level } from '../students.types'
 
 interface EnrollmentFormProps {
   opened: boolean
@@ -47,6 +47,20 @@ const STATUS_OPTIONS = [
   { value: 'baja', label: 'Baja' },
 ]
 
+function getGradeOptions(level: Level) {
+  if (level === 'jardin') {
+    return [3, 4, 5].map((n) => ({ value: String(n), label: `Sala de ${n}` }))
+  }
+  if (level === 'primaria') {
+    return [1, 2, 3, 4, 5, 6].map((n) => ({ value: String(n), label: `${n}° grado` }))
+  }
+  return [1, 2, 3, 4, 5, 6].map((n) => ({ value: String(n), label: `${n}° año` }))
+}
+
+function defaultGrade(level: Level): number {
+  return level === 'jardin' ? 3 : 1
+}
+
 export function EnrollmentForm({
   opened,
   onClose,
@@ -60,21 +74,25 @@ export function EnrollmentForm({
   const form = useForm({
     initialValues: {
       academicYear: enrollment?.academicYear ?? new Date().getFullYear(),
-      level: enrollment?.level ?? 'primaria',
-      gradeOrRoom: enrollment?.gradeOrRoom ?? '',
+      level: (enrollment?.level ?? 'primaria') as Level,
+      grade: enrollment?.grade ?? 1,
       section: enrollment?.section ?? 'A',
       shift: enrollment?.shift ?? 'manana',
       status: enrollment?.status ?? 'inscripto',
       enrollmentDate: enrollment?.enrollmentDate?.substring(0, 10) ?? '',
       notes: enrollment?.notes ?? '',
     },
-    validate: {
-      gradeOrRoom: (v) => (v.trim().length === 0 ? 'Requerido' : null),
-    },
   })
 
   const isPending = isEdit ? updateMutation.isPending : createMutation.isPending
   const error = isEdit ? updateMutation.error : createMutation.error
+  const gradeOptions = getGradeOptions(form.values.level)
+
+  function handleLevelChange(value: string | null) {
+    if (!value) return
+    const level = value as Level
+    form.setValues({ level, grade: defaultGrade(level) })
+  }
 
   const handleClose = () => {
     createMutation.reset()
@@ -86,11 +104,11 @@ export function EnrollmentForm({
   const handleSubmit = form.onSubmit((values) => {
     const data = {
       academicYear: values.academicYear,
-      level: values.level as 'jardin' | 'primaria' | 'secundaria',
-      gradeOrRoom: values.gradeOrRoom.trim(),
-      section: values.section as 'A' | 'B' | 'unico',
-      shift: values.shift as 'manana' | 'tarde' | 'completo',
-      status: values.status as 'inscripto' | 'confirmado' | 'baja',
+      level: values.level,
+      grade: values.grade,
+      section: values.section,
+      shift: values.shift,
+      status: values.status,
       enrollmentDate: values.enrollmentDate.trim() || undefined,
       notes: values.notes.trim() || undefined,
     }
@@ -133,13 +151,19 @@ export function EnrollmentForm({
               label="Nivel"
               required
               data={LEVEL_OPTIONS}
-              {...form.getInputProps('level')}
+              allowDeselect={false}
+              value={form.values.level}
+              onChange={handleLevelChange}
+              error={form.errors.level}
             />
-            <TextInput
+            <Select
               label="Grado / Sala"
-              placeholder="3° grado, Sala de 4..."
               required
-              {...form.getInputProps('gradeOrRoom')}
+              data={gradeOptions}
+              allowDeselect={false}
+              value={String(form.values.grade)}
+              onChange={(v) => form.setFieldValue('grade', Number(v))}
+              error={form.errors.grade}
             />
           </Group>
           <Group grow>
@@ -147,12 +171,14 @@ export function EnrollmentForm({
               label="Sección"
               required
               data={SECTION_OPTIONS}
+              allowDeselect={false}
               {...form.getInputProps('section')}
             />
             <Select
               label="Turno"
               required
               data={SHIFT_OPTIONS}
+              allowDeselect={false}
               {...form.getInputProps('shift')}
             />
           </Group>
@@ -160,6 +186,7 @@ export function EnrollmentForm({
             label="Estado"
             required
             data={STATUS_OPTIONS}
+            allowDeselect={false}
             {...form.getInputProps('status')}
           />
           <TextInput

@@ -11,9 +11,7 @@ export default function AppShellLayout() {
   const logout = useLogout()
 
   function handleLogout() {
-    logout.mutate(undefined, {
-      onSuccess: () => navigate('/login', { replace: true }),
-    })
+    logout.mutate()
   }
 
   return (
@@ -40,7 +38,7 @@ export default function AppShellLayout() {
               label="Configuración"
               leftSection={<IconSettings size={16} />}
               active={location.pathname.startsWith('/configuracion')}
-              onClick={() => navigate('/configuracion')}
+              onClick={() => navigate('/configuracion/usuarios')}
             />
           </Stack>
           <Group justify="space-between" px="xs">
