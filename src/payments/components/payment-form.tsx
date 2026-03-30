@@ -1,11 +1,12 @@
-import { Alert, Button, Group, Modal, Select, Stack, Textarea, TextInput } from '@mantine/core'
+import { Alert, Button, Group, Modal, Select, Stack, Text, Textarea, TextInput } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { IconAlertCircle } from '@tabler/icons-react'
+import Decimal from 'decimal.js'
 import { useState } from 'react'
 import type { Installment } from '../../installments/installments.types'
 import { getErrorMessage } from '../../lib/api-error'
 import { useCreatePayment } from '../hooks/use-create-payment'
-import type { PaymentMethod } from '../payments.types'
+import type { AllocationInput, PaymentMethod } from '../payments.types'
 
 const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: 'efectivo', label: 'Efectivo' },
@@ -17,6 +18,7 @@ interface PaymentFormProps {
   opened: boolean
   onClose: () => void
   familyId: string
+  /** Si se pasa una cuota, se pre-asigna el pago a ella. Undefined = pago a cuenta. */
   installment?: Installment
 }
 
@@ -26,9 +28,13 @@ export function PaymentForm({ opened, onClose, familyId, installment }: PaymentF
 
   const today = new Date().toISOString().substring(0, 10)
 
+  // Monto pendiente de la cuota (total - ya pagado de allocations previas no disponible aquí;
+  // usamos total como valor sugerido — el backend valida la coherencia)
+  const suggestedAmount = installment ? installment.total : ''
+
   const form = useForm({
     initialValues: {
-      amount: installment ? installment.total : '',
+      amount: suggestedAmount,
       paymentDate: today,
       method: 'efectivo' as PaymentMethod,
       reference: '',
@@ -45,10 +51,15 @@ export function PaymentForm({ opened, onClose, familyId, installment }: PaymentF
 
   const handleSubmit = form.onSubmit((values) => {
     setError(null)
+
+    const allocations: AllocationInput[] = installment
+      ? [{ installmentId: installment.id, allocatedAmount: values.amount }]
+      : []
+
     createMutation.mutate(
       {
         familyId,
-        installmentId: installment?.id,
+        allocations,
         amount: values.amount,
         paymentDate: values.paymentDate,
         method: values.method,
@@ -65,19 +76,30 @@ export function PaymentForm({ opened, onClose, familyId, installment }: PaymentF
     )
   })
 
+  const title = installment
+    ? `Registrar pago — ${installment.description}`
+    : 'Registrar pago a cuenta'
+
   return (
-    <Modal
-      opened={opened}
-      onClose={handleClose}
-      title={installment ? `Registrar pago — ${installment.description}` : 'Registrar pago'}
-      size="sm"
-    >
+    <Modal opened={opened} onClose={handleClose} title={title} size="sm">
       <form onSubmit={handleSubmit}>
         <Stack gap="sm">
           {error != null && (
             <Alert color="red" icon={<IconAlertCircle size={16} />}>
               {getErrorMessage(error)}
             </Alert>
+          )}
+
+          {installment && (
+            <Text size="sm" c="dimmed">
+              Total de la cuota: <strong>${new Decimal(installment.total).toFixed(2)}</strong>
+            </Text>
+          )}
+
+          {!installment && (
+            <Text size="sm" c="dimmed">
+              El monto quedará como saldo a favor de la familia.
+            </Text>
           )}
 
           <TextInput

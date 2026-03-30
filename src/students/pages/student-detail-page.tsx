@@ -1,29 +1,42 @@
 import {
   ActionIcon,
+  Alert,
   Badge,
   Button,
   Center,
   Divider,
   Group,
   Loader,
+  Modal,
+  NumberInput,
   Paper,
+  Select,
   SimpleGrid,
   Stack,
   Table,
   Text,
+  Textarea,
   Title,
 } from '@mantine/core'
+import { useForm } from '@mantine/form'
 import { useDisclosure } from '@mantine/hooks'
-import { IconArrowLeft, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react'
+import { IconAlertCircle, IconArrowLeft, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react'
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
+import { useAppliedDiscounts } from '../../discounts/hooks/use-applied-discounts'
+import { useApplyDiscount } from '../../discounts/hooks/use-apply-discount'
+import { useDiscounts } from '../../discounts/hooks/use-discounts'
+import { useRemoveAppliedDiscount } from '../../discounts/hooks/use-remove-applied-discount'
+import { AUTOMATIC_DISCOUNT_TYPES, DISCOUNT_TYPE_LABELS } from '../../discounts/discounts.types'
 import { useFeeConcepts } from '../../fee-concepts/hooks/use-fee-concepts'
 import { useFamilies } from '../../families/hooks/use-families'
 import { useInstitutions } from '../../institutions/hooks/use-institutions'
+import { getErrorMessage } from '../../lib/api-error'
 import { notifyError } from '../../lib/notifications'
 import { StudentServiceForm } from '../../student-services/components/student-service-form'
 import { useDeleteStudentService } from '../../student-services/hooks/use-student-services'
 import { useStudentServices } from '../../student-services/hooks/use-student-services'
+import { useSystemConfig } from '../../system-config/hooks/use-system-config'
 import { EmergencyContactForm } from '../components/emergency-contact-form'
 import { EnrollmentForm } from '../components/enrollment-form'
 import { StudentForm } from '../components/student-form'
@@ -125,12 +138,34 @@ export default function StudentDetailPage() {
   const [editService, setEditService] = useState<StudentService | null>(null)
 
   const { data: student, isLoading } = useStudent(studentId!)
+  const { data: config } = useSystemConfig()
+  const academicYear = config?.currentAcademicYear ?? new Date().getFullYear()
+
   const deleteContactMutation = useDeleteEmergencyContact()
   const deleteServiceMutation = useDeleteStudentService(studentId!)
   const { data: families } = useFamilies({ limit: 500, status: 'activa' })
   const { data: institutions } = useInstitutions()
   const { data: studentServices } = useStudentServices(studentId!)
   const { data: feeConcepts } = useFeeConcepts(student?.institution.id ?? null)
+  const { data: discounts = [] } = useDiscounts()
+  const { data: appliedDiscounts = [] } = useAppliedDiscounts(studentId!, academicYear)
+  const applyDiscountMutation = useApplyDiscount(studentId!, academicYear)
+  const removeAppliedMutation = useRemoveAppliedDiscount(studentId!, academicYear)
+  const [applyDiscountOpened, { open: openApplyDiscount, close: closeApplyDiscount }] =
+    useDisclosure(false)
+  const [applyDiscountError, setApplyDiscountError] = useState<unknown>(null)
+
+  const manualDiscounts = discounts.filter(
+    (d) => d.isActive && !AUTOMATIC_DISCOUNT_TYPES.includes(d.type),
+  )
+
+  const applyForm = useForm({
+    initialValues: {
+      discountId: '',
+      percentage: '',
+      notes: '',
+    },
+  })
 
   if (isLoading) {
     return (
@@ -355,6 +390,86 @@ export default function StudentDetailPage() {
 
       <Divider />
 
+      {/* Descuentos manuales */}
+      <Stack gap="sm">
+        <Group justify="space-between">
+          <Title order={3}>Descuentos {academicYear}</Title>
+          <Button
+            size="sm"
+            variant="default"
+            leftSection={<IconPlus size={14} />}
+            onClick={openApplyDiscount}
+            disabled={manualDiscounts.length === 0}
+          >
+            Asignar descuento
+          </Button>
+        </Group>
+        <Text size="sm" c="dimmed">
+          Solo descuentos manuales (beca, hijo de docente). El descuento por hermano y pronto pago
+          se aplican automáticamente.
+        </Text>
+        <Table.ScrollContainer minWidth={500}>
+          <Table withTableBorder withColumnBorders={false}>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Tipo</Table.Th>
+                <Table.Th>Porcentaje</Table.Th>
+                <Table.Th>Aprobado por</Table.Th>
+                <Table.Th>Notas</Table.Th>
+                <Table.Th>Acciones</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {appliedDiscounts.length === 0 ? (
+                <Table.Tr>
+                  <Table.Td colSpan={5} ta="center" py="xl">
+                    <Text c="dimmed">Sin descuentos asignados para {academicYear}</Text>
+                  </Table.Td>
+                </Table.Tr>
+              ) : (
+                appliedDiscounts.map((ad) => (
+                  <Table.Tr key={ad.id}>
+                    <Table.Td>
+                      <Badge variant="light" color="violet" size="sm">
+                        {DISCOUNT_TYPE_LABELS[ad.discount.type]}
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="sm" fw={500}>{ad.percentage}%</Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="sm" c="dimmed">
+                        {ad.approvedBy
+                          ? `${ad.approvedBy.firstName} ${ad.approvedBy.lastName}`
+                          : '—'}
+                      </Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <Text size="sm" c="dimmed">{ad.notes ?? '—'}</Text>
+                    </Table.Td>
+                    <Table.Td>
+                      <ActionIcon
+                        variant="subtle"
+                        color="red"
+                        aria-label="Quitar descuento"
+                        loading={removeAppliedMutation.isPending}
+                        onClick={() =>
+                          removeAppliedMutation.mutate(ad.id, { onError: notifyError })
+                        }
+                      >
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    </Table.Td>
+                  </Table.Tr>
+                ))
+              )}
+            </Table.Tbody>
+          </Table>
+        </Table.ScrollContainer>
+      </Stack>
+
+      <Divider />
+
       <Stack gap="sm">
         <Group justify="space-between">
           <Title order={3}>Contactos de emergencia</Title>
@@ -426,6 +541,80 @@ export default function StudentDetailPage() {
           </Table>
         </Table.ScrollContainer>
       </Stack>
+
+      {/* Modal: asignar descuento manual */}
+      <Modal
+        opened={applyDiscountOpened}
+        onClose={() => {
+          closeApplyDiscount()
+          applyForm.reset()
+          setApplyDiscountError(null)
+        }}
+        title="Asignar descuento"
+        size="sm"
+      >
+        <form
+          onSubmit={applyForm.onSubmit((values) => {
+            setApplyDiscountError(null)
+            const selected = discounts.find((d) => d.id === values.discountId)
+            applyDiscountMutation.mutate(
+              {
+                studentId: student.id,
+                discountId: values.discountId,
+                academicYear,
+                percentage: values.percentage || selected?.percentage,
+                notes: values.notes.trim() || undefined,
+              },
+              {
+                onSuccess: () => {
+                  closeApplyDiscount()
+                  applyForm.reset()
+                },
+                onError: (err) => setApplyDiscountError(err),
+              },
+            )
+          })}
+        >
+          <Stack gap="sm">
+            {applyDiscountError != null && (
+              <Alert color="red" icon={<IconAlertCircle size={16} />}>
+                {getErrorMessage(applyDiscountError)}
+              </Alert>
+            )}
+            <Select
+              label="Tipo de descuento"
+              required
+              data={manualDiscounts.map((d) => ({
+                value: d.id,
+                label: `${DISCOUNT_TYPE_LABELS[d.type]} (${d.percentage}%)`,
+              }))}
+              {...applyForm.getInputProps('discountId')}
+            />
+            <NumberInput
+              label="Porcentaje personalizado"
+              description="Dejá vacío para usar el porcentaje del catálogo."
+              min={0}
+              max={100}
+              decimalScale={2}
+              suffix="%"
+              {...applyForm.getInputProps('percentage')}
+            />
+            <Textarea label="Notas" rows={2} {...applyForm.getInputProps('notes')} />
+            <Group justify="flex-end" mt="sm">
+              <Button
+                variant="default"
+                onClick={() => { closeApplyDiscount(); applyForm.reset() }}
+                disabled={applyDiscountMutation.isPending}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" loading={applyDiscountMutation.isPending}>
+                Asignar
+              </Button>
+            </Group>
+          </Stack>
+        </form>
+      </Modal>
 
       <StudentServiceForm
         key="add-service"

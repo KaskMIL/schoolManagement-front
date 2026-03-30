@@ -22,6 +22,7 @@ import {
   IconChevronRight,
   IconCircleCheck,
   IconCreditCard,
+  IconDownload,
   IconPencil,
   IconPlus,
   IconTrash,
@@ -35,6 +36,7 @@ import { useAnnulInstallment } from '../../installments/hooks/use-annul-installm
 import { useInstallments } from '../../installments/hooks/use-installments'
 import type { Installment } from '../../installments/installments.types'
 import { notifyError } from '../../lib/notifications'
+import { paymentsApi } from '../../payments/payments.api'
 import { PaymentForm } from '../../payments/components/payment-form'
 import { usePayments } from '../../payments/hooks/use-payments'
 import { FamilyForm } from '../components/family-form'
@@ -107,6 +109,8 @@ export default function FamilyDetailPage() {
   // null = modal cerrado, undefined = pago a cuenta sin cuota, Installment = pago de cuota específica
   const [expandedInstallment, setExpandedInstallment] = useState<string | null>(null)
 
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
+
   const { data: family, isLoading } = useFamily(familyId!)
   const { data: installments = [] } = useInstallments(familyId!)
   const { data: payments = [] } = usePayments(familyId!)
@@ -114,6 +118,28 @@ export default function FamilyDetailPage() {
   const reactivateMutation = useReactivateFamily()
   const deleteGuardianMutation = useDeleteGuardian()
   const annulInstallmentMutation = useAnnulInstallment(familyId!)
+
+  const handleDownloadReceipt = async (paymentId: string, receiptNumber: number, year: number) => {
+    setDownloadingId(paymentId)
+    try {
+      const [receiptData, { pdf }, { ReceiptDocument }] = await Promise.all([
+        paymentsApi.getReceiptData(paymentId),
+        import('@react-pdf/renderer'),
+        import('../../payments/components/receipt-document'),
+      ])
+      const blob = await pdf(<ReceiptDocument data={receiptData} />).toBlob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `recibo-${String(receiptNumber).padStart(4, '0')}-${year}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      notifyError(err)
+    } finally {
+      setDownloadingId(null)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -451,12 +477,13 @@ export default function FamilyDetailPage() {
                 <Table.Th>Método</Table.Th>
                 <Table.Th>Cuota</Table.Th>
                 <Table.Th>Monto</Table.Th>
+                <Table.Th w={40} />
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
               {payments.length === 0 ? (
                 <Table.Tr>
-                  <Table.Td colSpan={5} ta="center" py="xl">
+                  <Table.Td colSpan={6} ta="center" py="xl">
                     <Text c="dimmed">Sin pagos registrados</Text>
                   </Table.Td>
                 </Table.Tr>
@@ -476,15 +503,40 @@ export default function FamilyDetailPage() {
                     <Table.Td>
                       <Text size="sm">{PAYMENT_METHOD_LABELS[payment.method]}</Text>
                     </Table.Td>
-                    <Table.Td>
-                      <Text size="sm" c={payment.installment ? undefined : 'dimmed'}>
-                        {payment.installment?.description ?? 'Pago a cuenta'}
-                      </Text>
+                     <Table.Td>
+                      {payment.allocations.length === 0 ? (
+                        <Text size="sm" c="dimmed">Pago a cuenta</Text>
+                      ) : payment.allocations.length === 1 ? (
+                        <Text size="sm">{payment.allocations[0].installment.description}</Text>
+                      ) : (
+                        <Text size="sm">
+                          {payment.allocations.length} cuotas
+                        </Text>
+                      )}
                     </Table.Td>
                     <Table.Td>
                       <Text size="sm" fw={500}>
                         ${formatMoney(payment.amount)}
                       </Text>
+                    </Table.Td>
+                    <Table.Td>
+                      {payment.receipt && (
+                        <ActionIcon
+                          variant="subtle"
+                          size="sm"
+                          aria-label="Descargar recibo"
+                          loading={downloadingId === payment.id}
+                          onClick={() =>
+                            void handleDownloadReceipt(
+                              payment.id,
+                              payment.receipt!.receiptNumber,
+                              payment.receipt!.academicYear,
+                            )
+                          }
+                        >
+                          <IconDownload size={14} />
+                        </ActionIcon>
+                      )}
                     </Table.Td>
                   </Table.Tr>
                 ))

@@ -49,6 +49,10 @@ export const router = createBrowserRouter([
                 path: 'general',
                 lazy: lazyComponent(import('./configuracion/pages/general-config-page')),
               },
+              {
+                path: 'descuentos',
+                lazy: lazyComponent(import('./configuracion/pages/descuentos-config-page')),
+              },
             ],
           },
         ],
@@ -59,10 +63,10 @@ export const router = createBrowserRouter([
     path: '/login',
     lazy: lazyComponent(import('./auth/login-page')),
   },
-  // {
-  //   path: '/',
-  //   lazy: lazyComponent(import('./home/home-route')),
-  // },
+  {
+    path: '/',
+    element: <Navigate to={'login'} />,
+  },
 ])
 
 function lazyComponent<T>(module: Promise<ModuleWithDefault<T>>) {
