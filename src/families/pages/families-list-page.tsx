@@ -12,7 +12,6 @@ import {
   Text,
   Title,
 } from '@mantine/core'
-import { useDisclosure } from '@mantine/hooks'
 import { IconBan, IconCircleCheck, IconPencil, IconPlus } from '@tabler/icons-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
@@ -38,8 +37,7 @@ type FilterValue = FamilyStatus | 'todas'
 export default function FamiliesListPage() {
   const navigate = useNavigate()
   const [page, setPage] = useState(1)
-  const [filter, setFilter] = useState<FilterValue>('todas')
-  const [createOpened, { open: openCreate, close: closeCreate }] = useDisclosure(false)
+  const [filter, setFilter] = useState<FilterValue>('activa')
   const [editFamily, setEditFamily] = useState<FamilySummary | null>(null)
 
   const status = filter === 'todas' ? undefined : filter
@@ -128,7 +126,10 @@ export default function FamiliesListPage() {
     <Stack gap="md">
       <Group justify="space-between">
         <Title order={2}>Familias</Title>
-        <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
+        <Button
+          leftSection={<IconPlus size={16} />}
+          onClick={() => void navigate('/familias/nueva')}
+        >
           Nueva familia
         </Button>
       </Group>
@@ -137,8 +138,8 @@ export default function FamiliesListPage() {
         value={filter}
         onChange={handleFilterChange}
         data={[
-          { value: 'todas', label: 'Todas' },
           { value: 'activa', label: 'Activas' },
+          { value: 'todas', label: 'Todas' },
           { value: 'inactiva', label: 'Inactivas' },
         ]}
         w="fit-content"
@@ -171,7 +172,6 @@ export default function FamiliesListPage() {
         </Group>
       )}
 
-      <FamilyForm key="create" opened={createOpened} onClose={closeCreate} />
       <FamilyForm
         key={editFamily?.id ?? 'edit'}
         opened={!!editFamily}
