@@ -18,7 +18,7 @@ import {
 import { useForm } from '@mantine/form'
 import { IconAlertCircle, IconArrowLeft, IconPlus, IconTrash } from '@tabler/icons-react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { familiesApi } from '../families.api'
 import type { Relationship } from '../families.types'
@@ -78,6 +78,7 @@ function defaultGrade(level: Level): number {
 // ─── Draft types ──────────────────────────────────────────────────────────────
 
 interface GuardianDraft {
+  _key: number
   firstName: string
   lastName: string
   relationship: Relationship
@@ -88,6 +89,7 @@ interface GuardianDraft {
 }
 
 interface StudentDraft {
+  _key: number
   firstName: string
   lastName: string
   dni: string
@@ -107,8 +109,9 @@ function cleanOptional(value: string): string | undefined {
   return value.trim() || undefined
 }
 
-function emptyGuardian(isPrimaryContact = false): GuardianDraft {
+function emptyGuardian(key: number, isPrimaryContact = false): GuardianDraft {
   return {
+    _key: key,
     firstName: '',
     lastName: '',
     relationship: 'padre',
@@ -119,8 +122,9 @@ function emptyGuardian(isPrimaryContact = false): GuardianDraft {
   }
 }
 
-function emptyStudent(academicYear: number, institutionId = ''): StudentDraft {
+function emptyStudent(key: number, academicYear: number, institutionId = ''): StudentDraft {
   return {
+    _key: key,
     firstName: '',
     lastName: '',
     dni: '',
@@ -146,7 +150,10 @@ export default function CreateFamilyPage() {
 
   const currentYear = systemConfig?.currentAcademicYear ?? new Date().getFullYear()
 
-  const [guardians, setGuardians] = useState<GuardianDraft[]>([emptyGuardian(true)])
+  const keyCounter = useRef(0)
+  const nextKey = () => ++keyCounter.current
+
+  const [guardians, setGuardians] = useState<GuardianDraft[]>([emptyGuardian(nextKey(), true)])
   const [students, setStudents] = useState<StudentDraft[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -177,7 +184,7 @@ export default function CreateFamilyPage() {
   // ── Guardian helpers ──────────────────────────────────────────────────────
 
   const addGuardian = () => {
-    setGuardians((prev) => [...prev, emptyGuardian()])
+    setGuardians((prev) => [...prev, emptyGuardian(nextKey())])
   }
 
   const removeGuardian = (idx: number) => {
@@ -206,7 +213,7 @@ export default function CreateFamilyPage() {
 
   const addStudent = () => {
     const defaultInstitution = institutionOptions[0]?.value ?? ''
-    setStudents((prev) => [...prev, emptyStudent(currentYear, defaultInstitution)])
+    setStudents((prev) => [...prev, emptyStudent(nextKey(), currentYear, defaultInstitution)])
   }
 
   const removeStudent = (idx: number) => {
@@ -274,6 +281,8 @@ export default function CreateFamilyPage() {
     setSubmitError(null)
     setIsSubmitting(true)
 
+    let createdFamilyId: string | null = null
+
     try {
       const values = form.values
 
@@ -286,47 +295,72 @@ export default function CreateFamilyPage() {
         locality: cleanOptional(values.locality),
         notes: cleanOptional(values.notes),
       })
+      createdFamilyId = family.id
 
       // 2. Crear responsables
-      for (const g of guardians) {
-        await familiesApi.createGuardian(family.id, {
-          firstName: g.firstName.trim(),
-          lastName: g.lastName.trim(),
-          relationship: g.relationship,
-          dni: cleanOptional(g.dni),
-          phone: cleanOptional(g.phone),
-          email: cleanOptional(g.email),
-          isPrimaryContact: g.isPrimaryContact,
-        })
+      for (let i = 0; i < guardians.length; i++) {
+        const g = guardians[i]
+        try {
+          await familiesApi.createGuardian(family.id, {
+            firstName: g.firstName.trim(),
+            lastName: g.lastName.trim(),
+            relationship: g.relationship,
+            dni: cleanOptional(g.dni),
+            phone: cleanOptional(g.phone),
+            email: cleanOptional(g.email),
+            isPrimaryContact: g.isPrimaryContact,
+          })
+        } catch (err) {
+          throw new Error(
+            `La familia fue creada pero falló el responsable ${i + 1} (${g.firstName} ${g.lastName}): ${getErrorMessage(err)}. Podés editarla desde el detalle.`,
+          )
+        }
       }
 
       // 3. Crear alumnos + inscripciones
-      for (const s of students) {
-        const student = await studentsApi.create({
-          familyId: family.id,
-          institutionId: s.institutionId,
-          firstName: s.firstName.trim(),
-          lastName: s.lastName.trim(),
-          dni: cleanOptional(s.dni),
-          birthDate: cleanOptional(s.birthDate),
-          gender: s.gender || undefined,
-        })
+      for (let i = 0; i < students.length; i++) {
+        const s = students[i]
+        let student: { id: string }
+        try {
+          student = await studentsApi.create({
+            familyId: family.id,
+            institutionId: s.institutionId,
+            firstName: s.firstName.trim(),
+            lastName: s.lastName.trim(),
+            dni: cleanOptional(s.dni),
+            birthDate: cleanOptional(s.birthDate),
+            gender: s.gender || undefined,
+          })
+        } catch (err) {
+          throw new Error(
+            `La familia fue creada pero falló el alumno ${i + 1} (${s.firstName} ${s.lastName}): ${getErrorMessage(err)}. Podés editarlo desde el detalle.`,
+          )
+        }
 
-        await studentsApi.createEnrollment(student.id, {
-          academicYear: s.academicYear,
-          level: s.level,
-          grade: s.grade,
-          section: s.section,
-          shift: s.shift,
-          status: 'inscripto',
-        })
+        try {
+          await studentsApi.createEnrollment(student.id, {
+            academicYear: s.academicYear,
+            level: s.level,
+            grade: s.grade,
+            section: s.section,
+            shift: s.shift,
+            status: 'inscripto',
+          })
+        } catch (err) {
+          throw new Error(
+            `La familia fue creada pero falló la inscripción del alumno ${i + 1} (${s.firstName} ${s.lastName}): ${getErrorMessage(err)}. Podés editarla desde el detalle.`,
+          )
+        }
       }
 
       void queryClient.invalidateQueries({ queryKey: ['families', 'list'] })
       void queryClient.invalidateQueries({ queryKey: ['students', 'list'] })
       void navigate(`/familias/${family.id}`)
     } catch (err) {
-      setSubmitError(getErrorMessage(err))
+      setSubmitError(err instanceof Error ? err.message : getErrorMessage(err))
+      if (createdFamilyId) {
+        void queryClient.invalidateQueries({ queryKey: ['families', 'list'] })
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -421,7 +455,7 @@ export default function CreateFamilyPage() {
         <Stack gap="sm">
           {guardians.map((g, idx) => (
             <Box
-              key={idx}
+              key={g._key}
               p="sm"
               style={{ border: '1px solid var(--mantine-color-gray-3)', borderRadius: 8 }}
             >
@@ -514,7 +548,7 @@ export default function CreateFamilyPage() {
             const gradeOptions = getGradeOptions(s.level)
             return (
               <Box
-                key={idx}
+                key={s._key}
                 p="sm"
                 style={{ border: '1px solid var(--mantine-color-gray-3)', borderRadius: 8 }}
               >
@@ -581,7 +615,7 @@ export default function CreateFamilyPage() {
                       min={2020}
                       max={2099}
                       value={s.academicYear}
-                      onChange={(v) => updateStudent(idx, 'academicYear', Number(v))}
+                      onChange={(v) => { if (v !== '') updateStudent(idx, 'academicYear', Number(v)) }}
                     />
                     <Select
                       label="Nivel"
