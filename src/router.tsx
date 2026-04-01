@@ -14,6 +14,10 @@ export const router = createBrowserRouter([
             lazy: lazyComponent(import('./families/pages/families-list-page')),
           },
           {
+            path: '/familias/nueva',
+            lazy: lazyComponent(import('./families/pages/create-family-page')),
+          },
+          {
             path: '/familias/:familyId',
             lazy: lazyComponent(import('./families/pages/family-detail-page')),
           },
