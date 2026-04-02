@@ -14,16 +14,18 @@ export function SpotlightSearch() {
 
   const enabled = debouncedQuery.length >= 2
 
-  const { data: familiesData } = useQuery({
+  const { data: familiesData, isFetching: familiesFetching } = useQuery({
     queryKey: ['spotlight', 'families', debouncedQuery],
     queryFn: () => familiesApi.list({ search: debouncedQuery, limit: 8 }),
     enabled,
+    staleTime: 30_000,
   })
 
-  const { data: studentsData } = useQuery({
+  const { data: studentsData, isFetching: studentsFetching } = useQuery({
     queryKey: ['spotlight', 'students', debouncedQuery],
     queryFn: () => studentsApi.list({ search: debouncedQuery, limit: 8 }),
     enabled,
+    staleTime: 30_000,
   })
 
   const familyActions = (familiesData?.items ?? []).map((f) => ({
@@ -46,8 +48,11 @@ export function SpotlightSearch() {
     ...(studentActions.length > 0 ? [{ group: 'Alumnos', actions: studentActions }] : []),
   ]
 
-  const nothingFound =
-    debouncedQuery.length < 2
+  const isLoading = familiesFetching || studentsFetching
+
+  const nothingFound = isLoading
+    ? 'Buscando...'
+    : debouncedQuery.length < 2
       ? 'Escribí al menos 2 caracteres para buscar'
       : `No se encontraron resultados para "${debouncedQuery}"`
 
