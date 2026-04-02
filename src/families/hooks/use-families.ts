@@ -6,6 +6,7 @@ interface UseFamiliesOptions {
   page?: number
   limit?: number
   status?: FamilyStatus
+  search?: string
 }
 
 export function useFamilies(opts: UseFamiliesOptions = {}) {
