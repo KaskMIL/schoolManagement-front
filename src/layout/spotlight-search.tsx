@@ -52,7 +52,7 @@ export function SpotlightSearch() {
 
   const nothingFound = isLoading
     ? 'Buscando...'
-    : debouncedQuery.length < 2
+    : query.length < 2
       ? 'Escribí al menos 2 caracteres para buscar'
       : `No se encontraron resultados para "${debouncedQuery}"`
 

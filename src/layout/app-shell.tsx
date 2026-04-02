@@ -41,8 +41,9 @@ export default function AppShellLayout() {
         </Stack>
       </AppShell.Navbar>
 
+      <SpotlightSearch />
+
       <AppShell.Main>
-        <SpotlightSearch />
         <Outlet />
       </AppShell.Main>
     </AppShell>
